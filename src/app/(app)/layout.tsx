@@ -16,7 +16,7 @@ export default async function AppLayout({
         user={user}
         foundationName={settings?.foundationName ?? "Fundación"}
       />
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6">
+      <main className="mx-auto w-full max-w-[1600px] flex-1 px-3 py-4 sm:px-5 sm:py-6 lg:px-6">
         {children}
       </main>
     </>

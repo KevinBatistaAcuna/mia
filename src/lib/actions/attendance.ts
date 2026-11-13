@@ -12,7 +12,7 @@ import {
   type AttendanceStatus,
   type Specialty,
 } from "@/db/schema";
-import { requireUser } from "@/lib/auth";
+import { requireEditor, requireUser } from "@/lib/auth";
 import { getWeekCycle, getWeekday, monthBounds } from "@/lib/cycle";
 import { createId } from "@/lib/id";
 
@@ -100,7 +100,7 @@ export async function markAttendanceAction(
   slotIds: string[],
   status: AttendanceStatus,
 ): Promise<ActionResult> {
-  const user = await requireUser();
+  const user = await requireEditor();
 
   if (!date || slotIds.length === 0) {
     return { ok: false, error: "Selecciona al menos un niño." };

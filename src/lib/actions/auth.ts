@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { users } from "@/db/schema";
-import { createSession, destroySession } from "@/lib/auth";
+import { createSession, destroySession, homePathForRole } from "@/lib/auth";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -39,7 +39,7 @@ export async function loginAction(
     role: user.role,
   });
 
-  redirect("/asistencia");
+  redirect(homePathForRole(user.role));
 }
 
 export async function logoutAction() {

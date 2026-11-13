@@ -11,10 +11,17 @@ import {
   type Specialty,
   type WeekCycle,
 } from "@/db/schema";
-import { requireUser } from "@/lib/auth";
+import { requireEditor, requireUser } from "@/lib/auth";
 import { createId } from "@/lib/id";
+import { getSettings } from "@/lib/actions/settings";
+import { DEFAULT_ACTIVE_WEEKDAYS } from "@/lib/constants";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
+
+async function getAllowedWeekdays() {
+  const settings = await getSettings();
+  return settings?.activeWeekdays ?? [...DEFAULT_ACTIVE_WEEKDAYS];
+}
 
 export async function listScheduleSlots(weekCycle?: WeekCycle) {
   await requireUser();
@@ -45,7 +52,7 @@ export async function createSlotAction(
   _prev: ActionResult | null,
   formData: FormData,
 ): Promise<ActionResult> {
-  await requireUser();
+  await requireEditor();
   const childId = String(formData.get("childId") ?? "");
   const specialty = String(formData.get("specialty") ?? "") as Specialty;
   const weekday = Number(formData.get("weekday"));
@@ -58,8 +65,9 @@ export async function createSlotAction(
   if (!specialties.includes(specialty) || !weekCycles.includes(weekCycle)) {
     return { ok: false, error: "Datos inválidos." };
   }
-  if (weekday < 1 || weekday > 6) {
-    return { ok: false, error: "Día inválido." };
+  const allowedWeekdays = await getAllowedWeekdays();
+  if (!allowedWeekdays.includes(weekday)) {
+    return { ok: false, error: "Ese día no está activo en la agenda." };
   }
 
   try {
@@ -87,7 +95,7 @@ export async function reassignSlotAction(
   _prev: ActionResult | null,
   formData: FormData,
 ): Promise<ActionResult> {
-  await requireUser();
+  await requireEditor();
   const slotId = String(formData.get("slotId") ?? "");
   const childId = String(formData.get("childId") ?? "");
 
@@ -109,7 +117,7 @@ export async function updateSlotAction(
   _prev: ActionResult | null,
   formData: FormData,
 ): Promise<ActionResult> {
-  await requireUser();
+  await requireEditor();
   const slotId = String(formData.get("slotId") ?? "");
   const childId = String(formData.get("childId") ?? "");
   const specialty = String(formData.get("specialty") ?? "") as Specialty;
@@ -119,6 +127,10 @@ export async function updateSlotAction(
 
   if (!slotId || !childId || !time || Number.isNaN(weekday)) {
     return { ok: false, error: "Completa todos los campos." };
+  }
+  const allowedWeekdays = await getAllowedWeekdays();
+  if (!allowedWeekdays.includes(weekday)) {
+    return { ok: false, error: "Ese día no está activo en la agenda." };
   }
 
   try {
@@ -139,7 +151,7 @@ export async function updateSlotAction(
 }
 
 export async function deleteSlotAction(slotId: string): Promise<ActionResult> {
-  await requireUser();
+  await requireEditor();
   if (!slotId) return { ok: false, error: "Slot inválido." };
 
   await db.delete(scheduleSlots).where(eq(scheduleSlots.id, slotId));

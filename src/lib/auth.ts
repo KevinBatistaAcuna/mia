@@ -98,14 +98,25 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   return user ?? null;
 }
 
+export function homePathForRole(role: UserRole): string {
+  return role === "therapist" ? "/agenda" : "/asistencia";
+}
+
 export async function requireUser(): Promise<SessionUser> {
   const user = await getSessionUser();
   if (!user) redirect("/login");
   return user;
 }
 
+/** Admin or assistant — can mark attendance and edit agenda/children. */
+export async function requireEditor(): Promise<SessionUser> {
+  const user = await requireUser();
+  if (user.role === "therapist") redirect("/agenda");
+  return user;
+}
+
 export async function requireAdmin(): Promise<SessionUser> {
   const user = await requireUser();
-  if (user.role !== "admin") redirect("/asistencia");
+  if (user.role !== "admin") redirect(homePathForRole(user.role));
   return user;
 }

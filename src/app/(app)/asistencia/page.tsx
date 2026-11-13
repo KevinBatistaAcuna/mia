@@ -1,5 +1,6 @@
 import { AttendanceBoard } from "@/components/AttendanceBoard";
 import { getDayAttendance } from "@/lib/actions/attendance";
+import { requireEditor } from "@/lib/auth";
 import { todayLocal } from "@/lib/cycle";
 import type { Specialty } from "@/db/schema";
 
@@ -8,6 +9,7 @@ export default async function AsistenciaPage({
 }: {
   searchParams: Promise<{ date?: string; specialty?: string }>;
 }) {
+  await requireEditor();
   const params = await searchParams;
   const date = params.date && /^\d{4}-\d{2}-\d{2}$/.test(params.date)
     ? params.date

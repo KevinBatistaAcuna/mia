@@ -1,7 +1,9 @@
 import { ChildrenManager } from "@/components/ChildrenManager";
 import { listChildren } from "@/lib/actions/children";
+import { requireEditor } from "@/lib/auth";
 
 export default async function NinosPage() {
+  await requireEditor();
   const childrenList = await listChildren(true);
 
   return (
@@ -11,7 +13,7 @@ export default async function NinosPage() {
           Niños
         </h1>
         <p className="text-muted">
-          Alta y estado de los niños de la fundación.
+          Alta, monto mensual y estado de los niños de la fundación.
         </p>
       </div>
       <ChildrenManager childrenList={childrenList} />

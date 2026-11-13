@@ -32,6 +32,7 @@ async function seed() {
       id: 1,
       foundationName: "MIA Fundación",
       cycleStartDate: todayLocal(),
+      activeWeekdays: "[1,2,3]",
     });
     console.log("Configuración inicial creada");
   } else {

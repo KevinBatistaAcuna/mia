@@ -8,11 +8,13 @@ import {
   updateChildAction,
   type ActionResult,
 } from "@/lib/actions/children";
+import { centsToInputValue, formatMoney } from "@/lib/money";
 
 type Child = {
   id: string;
   name: string;
   active: boolean;
+  monthlyFeeCents: number;
 };
 
 const initial: ActionResult | null = null;
@@ -32,7 +34,9 @@ export function ChildrenManager({ childrenList }: { childrenList: Child[] }) {
 
   useEffect(() => {
     if (createState?.ok) {
-      const form = document.getElementById("create-child-form") as HTMLFormElement | null;
+      const form = document.getElementById(
+        "create-child-form",
+      ) as HTMLFormElement | null;
       form?.reset();
     }
   }, [createState]);
@@ -45,13 +49,33 @@ export function ChildrenManager({ childrenList }: { childrenList: Child[] }) {
     <div className="space-y-6">
       <section className="card p-5">
         <h2 className="mb-4 text-lg font-semibold">Agregar niño</h2>
-        <form id="create-child-form" action={createAction} className="flex flex-col gap-3 sm:flex-row">
-          <div className="field flex-1">
+        <form
+          id="create-child-form"
+          action={createAction}
+          className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_10rem_auto]"
+        >
+          <div className="field">
             <label htmlFor="name">Nombre completo</label>
             <input id="name" name="name" required placeholder="Kevin Batista" />
           </div>
+          <div className="field">
+            <label htmlFor="monthlyFee">Monto mensual</label>
+            <input
+              id="monthlyFee"
+              name="monthlyFee"
+              type="text"
+              inputMode="decimal"
+              required
+              placeholder="0"
+              defaultValue="0"
+            />
+          </div>
           <div className="flex items-end">
-            <button type="submit" className="btn btn-primary w-full sm:w-auto" disabled={createPending}>
+            <button
+              type="submit"
+              className="btn btn-primary w-full sm:w-auto"
+              disabled={createPending}
+            >
               {createPending ? "Guardando..." : "Agregar"}
             </button>
           </div>
@@ -65,7 +89,7 @@ export function ChildrenManager({ childrenList }: { childrenList: Child[] }) {
         <div className="border-b border-border px-5 py-4">
           <h2 className="text-lg font-semibold">Listado</h2>
           <p className="text-sm text-muted">
-            Los inactivos no aparecen en agenda ni asistencia.
+            Los inactivos no aparecen en agenda, asistencia ni pagos.
           </p>
         </div>
         <ul className="divide-y divide-border">
@@ -79,14 +103,27 @@ export function ChildrenManager({ childrenList }: { childrenList: Child[] }) {
                 {editing?.id === child.id ? (
                   <form action={editAction} className="space-y-3">
                     <input type="hidden" name="id" value={child.id} />
-                    <div className="field">
-                      <label htmlFor={`edit-${child.id}`}>Nombre</label>
-                      <input
-                        id={`edit-${child.id}`}
-                        name="name"
-                        defaultValue={child.name}
-                        required
-                      />
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="field">
+                        <label htmlFor={`edit-${child.id}`}>Nombre</label>
+                        <input
+                          id={`edit-${child.id}`}
+                          name="name"
+                          defaultValue={child.name}
+                          required
+                        />
+                      </div>
+                      <div className="field">
+                        <label htmlFor={`fee-${child.id}`}>Monto mensual</label>
+                        <input
+                          id={`fee-${child.id}`}
+                          name="monthlyFee"
+                          type="text"
+                          inputMode="decimal"
+                          required
+                          defaultValue={centsToInputValue(child.monthlyFeeCents)}
+                        />
+                      </div>
                     </div>
                     <label className="flex items-center gap-2 text-sm">
                       <input
@@ -97,7 +134,11 @@ export function ChildrenManager({ childrenList }: { childrenList: Child[] }) {
                       Activo
                     </label>
                     <div className="flex gap-2">
-                      <button type="submit" className="btn btn-primary" disabled={editPending}>
+                      <button
+                        type="submit"
+                        className="btn btn-primary"
+                        disabled={editPending}
+                      >
                         Guardar
                       </button>
                       <button
@@ -117,7 +158,8 @@ export function ChildrenManager({ childrenList }: { childrenList: Child[] }) {
                     <div>
                       <p className="font-semibold">{child.name}</p>
                       <p className="text-sm text-muted">
-                        {child.active ? "Activo" : "Inactivo"}
+                        {child.active ? "Activo" : "Inactivo"} · Mensual{" "}
+                        {formatMoney(child.monthlyFeeCents)}
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -133,7 +175,10 @@ export function ChildrenManager({ childrenList }: { childrenList: Child[] }) {
                         className="btn btn-secondary"
                         onClick={() =>
                           startTransition(async () => {
-                            await toggleChildActiveAction(child.id, !child.active);
+                            await toggleChildActiveAction(
+                              child.id,
+                              !child.active,
+                            );
                             router.refresh();
                           })
                         }

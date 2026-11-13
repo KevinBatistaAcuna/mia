@@ -4,13 +4,15 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logoutAction } from "@/lib/actions/auth";
 import type { SessionUser } from "@/lib/auth";
+import { ROLE_LABELS } from "@/lib/constants";
 
-const links = [
-  { href: "/asistencia", label: "Asistencia" },
-  { href: "/agenda", label: "Agenda" },
-  { href: "/ninos", label: "Niños" },
-  { href: "/reportes", label: "Reportes" },
-];
+const allLinks = [
+  { href: "/asistencia", label: "Asistencia", roles: ["admin", "assistant"] },
+  { href: "/agenda", label: "Agenda", roles: ["admin", "assistant", "therapist"] },
+  { href: "/ninos", label: "Niños", roles: ["admin", "assistant"] },
+  { href: "/pagos", label: "Pagos", roles: ["admin", "assistant"] },
+  { href: "/reportes", label: "Reportes", roles: ["admin", "assistant"] },
+] as const;
 
 export function AppNav({
   user,
@@ -20,10 +22,13 @@ export function AppNav({
   foundationName: string;
 }) {
   const pathname = usePathname();
+  const links = allLinks.filter((link) =>
+    (link.roles as readonly string[]).includes(user.role),
+  );
 
   return (
     <header className="sticky top-0 z-20 border-b border-border bg-[rgba(243,247,246,0.92)] backdrop-blur">
-      <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-3 sm:px-6">
+      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-3 px-3 py-3 sm:px-5 lg:px-6">
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="font-[family-name:var(--font-display)] text-xl font-semibold tracking-tight text-primary">
@@ -34,9 +39,7 @@ export function AppNav({
           <div className="flex items-center gap-2">
             <div className="hidden text-right sm:block">
               <p className="text-sm font-semibold">{user.name}</p>
-              <p className="text-xs text-muted">
-                {user.role === "admin" ? "Administradora" : "Asistente"}
-              </p>
+              <p className="text-xs text-muted">{ROLE_LABELS[user.role]}</p>
             </div>
             <form action={logoutAction}>
               <button type="submit" className="btn btn-secondary text-sm">

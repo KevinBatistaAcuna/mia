@@ -94,9 +94,48 @@ export function AttendanceBoard({
     applyStatus("presente", ids);
   }
 
+  const selectionSummary = (
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm text-muted">
+        {selected.size} seleccionado(s) · {pendingCount} pendiente(s)
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className="btn btn-secondary" onClick={toggleAll}>
+          {selected.size === filtered.length && filtered.length > 0
+            ? "Quitar selección"
+            : "Seleccionar todos"}
+        </button>
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={pending}
+          onClick={markPendingPresent}
+        >
+          Pendientes → Presente
+        </button>
+      </div>
+    </div>
+  );
+
+  const statusButtons = (
+    <div className="flex flex-col gap-2">
+      {attendanceStatuses.map((status) => (
+        <button
+          key={status}
+          type="button"
+          className={`btn w-full justify-start border text-sm ${STATUS_COLORS[status]}`}
+          disabled={pending || selected.size === 0}
+          onClick={() => applyStatus(status)}
+        >
+          {STATUS_LABELS[status]}
+        </button>
+      ))}
+    </div>
+  );
+
   return (
-    <div className="space-y-5">
-      <div className="card space-y-4 p-5">
+    <div className="space-y-4">
+      <div className="card space-y-3 p-4 sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-wide text-muted">
@@ -154,96 +193,108 @@ export function AttendanceBoard({
         </div>
       ) : (
         <>
-          <div className="card space-y-3 border border-border p-4 sm:sticky sm:top-[6.5rem] sm:z-10 sm:shadow-lg">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm text-muted">
-                {selected.size} seleccionado(s) · {pendingCount} pendiente(s)
-              </p>
-              <div className="flex w-full flex-wrap gap-2 sm:w-auto">
-                <button type="button" className="btn btn-secondary flex-1 sm:flex-none" onClick={toggleAll}>
+          <div className="card space-y-2 p-3 lg:hidden">
+            {selectionSummary}
+            {message ? (
+              <p className="text-sm text-primary-dark">{message}</p>
+            ) : null}
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_16.5rem] lg:items-start">
+            <ul className="space-y-1.5 pb-24 lg:pb-0">
+              {filtered.length === 0 ? (
+                <li className="card p-8 text-center text-muted">
+                  No hay citas para esta fecha y filtro.
+                </li>
+              ) : (
+                filtered.map((item) => {
+                  const isSelected = selected.has(item.slotId);
+                  return (
+                    <li key={item.slotId}>
+                      <button
+                        type="button"
+                        onClick={() => toggle(item.slotId)}
+                        className={`card flex w-full items-center gap-2.5 px-3 py-2 text-left transition active:scale-[0.99] ${
+                          isSelected ? "ring-2 ring-ring" : ""
+                        }`}
+                      >
+                        <span
+                          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[0.65rem] leading-none ${
+                            isSelected
+                              ? "border-primary bg-primary text-white"
+                              : "border-border bg-white"
+                          }`}
+                        >
+                          {isSelected ? "✓" : ""}
+                        </span>
+                        <span className="w-11 shrink-0 text-sm font-semibold tabular-nums text-muted">
+                          {item.time}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold leading-tight">
+                            {item.childName}
+                          </span>
+                          <span className="block truncate text-xs text-muted">
+                            {SPECIALTY_LABELS[item.specialty]}
+                          </span>
+                        </span>
+                        <span
+                          className={`max-w-[7.5rem] shrink-0 truncate rounded-full border px-2 py-0.5 text-[0.7rem] font-semibold ${
+                            item.status
+                              ? STATUS_COLORS[item.status]
+                              : "border-dashed border-slate-300 text-slate-500"
+                          }`}
+                        >
+                          {item.status
+                            ? STATUS_LABELS[item.status]
+                            : "Pendiente"}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })
+              )}
+            </ul>
+
+            <aside className="card sticky top-24 hidden space-y-3 p-4 lg:block">
+              <div>
+                <p className="text-sm font-semibold">Marcar estado</p>
+                <p className="text-sm text-muted">
+                  {selected.size} seleccionado(s) · {pendingCount} pendiente(s)
+                </p>
+              </div>
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  className="btn btn-secondary w-full"
+                  onClick={toggleAll}
+                >
                   {selected.size === filtered.length && filtered.length > 0
                     ? "Quitar selección"
                     : "Seleccionar todos"}
                 </button>
                 <button
                   type="button"
-                  className="btn btn-primary flex-1 sm:flex-none"
+                  className="btn btn-primary w-full"
                   disabled={pending}
                   onClick={markPendingPresent}
                 >
                   Pendientes → Presente
                 </button>
               </div>
-            </div>
-            <div className="hidden flex-wrap gap-2 sm:flex">
-              {attendanceStatuses.map((status) => (
-                <button
-                  key={status}
-                  type="button"
-                  className="btn btn-secondary"
-                  disabled={pending || selected.size === 0}
-                  onClick={() => applyStatus(status)}
-                >
-                  {STATUS_LABELS[status]}
-                </button>
-              ))}
-            </div>
-            {message ? (
-              <p className="text-sm text-primary-dark">{message}</p>
-            ) : null}
+              <div className="border-t border-border pt-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
+                  Aplicar a selección
+                </p>
+                {statusButtons}
+              </div>
+              {message ? (
+                <p className="text-sm text-primary-dark">{message}</p>
+              ) : null}
+            </aside>
           </div>
 
-          <ul className="space-y-2 pb-28 sm:pb-0">
-            {filtered.length === 0 ? (
-              <li className="card p-8 text-center text-muted">
-                No hay citas para esta fecha y filtro.
-              </li>
-            ) : (
-              filtered.map((item) => {
-                const isSelected = selected.has(item.slotId);
-                return (
-                  <li key={item.slotId}>
-                    <button
-                      type="button"
-                      onClick={() => toggle(item.slotId)}
-                      className={`card flex w-full items-center gap-3 px-4 py-4 text-left transition active:scale-[0.99] sm:py-4 ${
-                        isSelected ? "ring-2 ring-ring" : ""
-                      }`}
-                    >
-                      <span
-                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
-                          isSelected
-                            ? "border-primary bg-primary text-white"
-                            : "border-border bg-white"
-                        }`}
-                      >
-                        {isSelected ? "✓" : ""}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block font-semibold">
-                          {item.time} · {item.childName}
-                        </span>
-                        <span className="block text-sm text-muted">
-                          {SPECIALTY_LABELS[item.specialty]}
-                        </span>
-                      </span>
-                      <span
-                        className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${
-                          item.status
-                            ? STATUS_COLORS[item.status]
-                            : "border-dashed border-slate-300 text-slate-500"
-                        }`}
-                      >
-                        {item.status ? STATUS_LABELS[item.status] : "Pendiente"}
-                      </span>
-                    </button>
-                  </li>
-                );
-              })
-            )}
-          </ul>
-
-          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-[rgba(243,247,246,0.96)] p-3 backdrop-blur sm:hidden">
+          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-[rgba(243,247,246,0.96)] p-3 backdrop-blur lg:hidden">
             <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-[env(safe-area-inset-bottom)]">
               {attendanceStatuses.map((status) => (
                 <button
@@ -259,6 +310,7 @@ export function AttendanceBoard({
             </div>
           </div>
         </>
+
       )}
     </div>
   );

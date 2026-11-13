@@ -5,7 +5,9 @@ import { requireUser } from "@/lib/auth";
 
 export default async function ConfiguracionPage() {
   const user = await requireUser();
-  if (user.role !== "admin") redirect("/asistencia");
+  if (user.role !== "admin") {
+    redirect(user.role === "therapist" ? "/agenda" : "/asistencia");
+  }
 
   const [settings, users] = await Promise.all([getSettings(), listUsers()]);
 
@@ -24,10 +26,15 @@ export default async function ConfiguracionPage() {
           Configuración
         </h1>
         <p className="text-muted">
-          Solo la administradora gestiona usuarios y el ciclo A/B.
+          Solo la administradora gestiona usuarios, días de atención y el ciclo
+          A/B.
         </p>
       </div>
-      <SettingsPanel settings={settings} users={users} />
+      <SettingsPanel
+        settings={settings}
+        users={users}
+        currentUserId={user.id}
+      />
     </div>
   );
 }

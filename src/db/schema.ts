@@ -6,7 +6,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 
-export const userRoles = ["admin", "assistant"] as const;
+export const userRoles = ["admin", "assistant", "therapist"] as const;
 export type UserRole = (typeof userRoles)[number];
 
 export const specialties = ["fisica", "lenguaje", "ocupacional"] as const;
@@ -39,15 +39,43 @@ export const children = sqliteTable("children", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   active: integer("active", { mode: "boolean" }).notNull().default(true),
+  /** Monthly fee in cents (minor units). */
+  monthlyFeeCents: integer("monthly_fee_cents").notNull().default(0),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .default(sql`(unixepoch() * 1000)`),
 });
 
+export const payments = sqliteTable(
+  "payments",
+  {
+    id: text("id").primaryKey(),
+    childId: text("child_id")
+      .notNull()
+      .references(() => children.id, { onDelete: "cascade" }),
+    yearMonth: text("year_month").notNull(),
+    amountPaidCents: integer("amount_paid_cents").notNull(),
+    receiptNumber: text("receipt_number").notNull(),
+    payerName: text("payer_name").notNull(),
+    paidAt: text("paid_at").notNull(),
+    markedBy: text("marked_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (table) => [
+    uniqueIndex("payment_child_month").on(table.childId, table.yearMonth),
+  ],
+);
+
 export const foundationSettings = sqliteTable("foundation_settings", {
   id: integer("id").primaryKey().default(1),
   foundationName: text("foundation_name").notNull().default("Fundación"),
   cycleStartDate: text("cycle_start_date").notNull(),
+  /** JSON array of weekdays 1–5, e.g. "[1,2,3]" */
+  activeWeekdays: text("active_weekdays").notNull().default("[1,2,3]"),
 });
 
 export const scheduleSlots = sqliteTable(
@@ -104,6 +132,18 @@ export const attendanceRecords = sqliteTable(
 export const childrenRelations = relations(children, ({ many }) => ({
   slots: many(scheduleSlots),
   attendance: many(attendanceRecords),
+  payments: many(payments),
+}));
+
+export const paymentsRelations = relations(payments, ({ one }) => ({
+  child: one(children, {
+    fields: [payments.childId],
+    references: [children.id],
+  }),
+  marker: one(users, {
+    fields: [payments.markedBy],
+    references: [users.id],
+  }),
 }));
 
 export const scheduleSlotsRelations = relations(scheduleSlots, ({ one }) => ({

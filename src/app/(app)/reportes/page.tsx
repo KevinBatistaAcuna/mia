@@ -1,5 +1,6 @@
 import { ReportsView } from "@/components/ReportsView";
 import { getMonthlyReport } from "@/lib/actions/attendance";
+import { requireEditor } from "@/lib/auth";
 import { currentYearMonth } from "@/lib/cycle";
 
 export default async function ReportesPage({
@@ -7,6 +8,7 @@ export default async function ReportesPage({
 }: {
   searchParams: Promise<{ month?: string }>;
 }) {
+  await requireEditor();
   const params = await searchParams;
   const yearMonth =
     params.month && /^\d{4}-\d{2}$/.test(params.month)
