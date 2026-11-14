@@ -1,19 +1,40 @@
-import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
+import { loadEnvConfig } from "@next/env";
+import { createClient, type Client } from "@libsql/client";
+import { drizzle } from "drizzle-orm/libsql";
 import fs from "node:fs";
 import path from "node:path";
 import * as schema from "./schema";
 
-const dbFile = process.env.DATABASE_PATH ?? "mia.db";
-const absolutePath = path.isAbsolute(dbFile)
-  ? dbFile
-  : path.join(/*turbopackIgnore: true*/ process.cwd(), "data", path.basename(dbFile));
+loadEnvConfig(process.cwd());
 
-fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
+function resolveLocalFileUrl() {
+  const dbFile = process.env.DATABASE_PATH ?? "mia.db";
+  const absolutePath = path.isAbsolute(dbFile)
+    ? dbFile
+    : path.join(
+        /*turbopackIgnore: true*/ process.cwd(),
+        "data",
+        path.basename(dbFile),
+      );
 
-const sqlite = new Database(absolutePath);
-sqlite.pragma("journal_mode = WAL");
-sqlite.pragma("foreign_keys = ON");
+  fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
+  return `file:${absolutePath.replace(/\\/g, "/")}`;
+}
 
-export const db = drizzle(sqlite, { schema });
+function createDbClient(): Client {
+  const url = process.env.TURSO_DATABASE_URL?.trim();
+  const authToken = process.env.TURSO_AUTH_TOKEN?.trim();
+
+  if (url && (url.startsWith("libsql://") || url.startsWith("https://"))) {
+    return createClient({ url, authToken });
+  }
+
+  return createClient({
+    url: url && url.startsWith("file:") ? url : resolveLocalFileUrl(),
+  });
+}
+
+const client = createDbClient();
+
+export const db = drizzle(client, { schema });
 export type Db = typeof db;

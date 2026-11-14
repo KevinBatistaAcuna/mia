@@ -1,8 +1,13 @@
-import { db } from "./index";
 import { sql } from "drizzle-orm";
+import { db } from "./index";
+
+async function tableHasColumn(table: string, column: string) {
+  const result = await db.$client.execute(`PRAGMA table_info(${table})`);
+  return result.rows.some((row) => String(row.name) === column);
+}
 
 async function migrate() {
-  db.run(sql`
+  await db.run(sql`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY NOT NULL,
       email TEXT NOT NULL UNIQUE,
@@ -13,7 +18,7 @@ async function migrate() {
     )
   `);
 
-  db.run(sql`
+  await db.run(sql`
     CREATE TABLE IF NOT EXISTS children (
       id TEXT PRIMARY KEY NOT NULL,
       name TEXT NOT NULL,
@@ -23,16 +28,13 @@ async function migrate() {
     )
   `);
 
-  const childrenCols = db.$client
-    .prepare("PRAGMA table_info(children)")
-    .all() as { name: string }[];
-  if (!childrenCols.some((col) => col.name === "monthly_fee_cents")) {
-    db.run(
+  if (!(await tableHasColumn("children", "monthly_fee_cents"))) {
+    await db.run(
       sql`ALTER TABLE children ADD COLUMN monthly_fee_cents INTEGER NOT NULL DEFAULT 0`,
     );
   }
 
-  db.run(sql`
+  await db.run(sql`
     CREATE TABLE IF NOT EXISTS foundation_settings (
       id INTEGER PRIMARY KEY DEFAULT 1,
       foundation_name TEXT NOT NULL DEFAULT 'Fundación',
@@ -41,16 +43,13 @@ async function migrate() {
     )
   `);
 
-  const settingsCols = db.$client
-    .prepare("PRAGMA table_info(foundation_settings)")
-    .all() as { name: string }[];
-  if (!settingsCols.some((col) => col.name === "active_weekdays")) {
-    db.run(
+  if (!(await tableHasColumn("foundation_settings", "active_weekdays"))) {
+    await db.run(
       sql`ALTER TABLE foundation_settings ADD COLUMN active_weekdays TEXT NOT NULL DEFAULT '[1,2,3]'`,
     );
   }
 
-  db.run(sql`
+  await db.run(sql`
     CREATE TABLE IF NOT EXISTS schedule_slots (
       id TEXT PRIMARY KEY NOT NULL,
       child_id TEXT NOT NULL REFERENCES children(id) ON DELETE CASCADE,
@@ -62,12 +61,12 @@ async function migrate() {
     )
   `);
 
-  db.run(sql`
+  await db.run(sql`
     CREATE UNIQUE INDEX IF NOT EXISTS slot_unique
     ON schedule_slots (specialty, weekday, time, week_cycle)
   `);
 
-  db.run(sql`
+  await db.run(sql`
     CREATE TABLE IF NOT EXISTS attendance_records (
       id TEXT PRIMARY KEY NOT NULL,
       date TEXT NOT NULL,
@@ -81,12 +80,12 @@ async function migrate() {
     )
   `);
 
-  db.run(sql`
+  await db.run(sql`
     CREATE UNIQUE INDEX IF NOT EXISTS attendance_day_slot
     ON attendance_records (date, slot_id)
   `);
 
-  db.run(sql`
+  await db.run(sql`
     CREATE TABLE IF NOT EXISTS payments (
       id TEXT PRIMARY KEY NOT NULL,
       child_id TEXT NOT NULL REFERENCES children(id) ON DELETE CASCADE,
@@ -100,7 +99,7 @@ async function migrate() {
     )
   `);
 
-  db.run(sql`
+  await db.run(sql`
     CREATE UNIQUE INDEX IF NOT EXISTS payment_child_month
     ON payments (child_id, year_month)
   `);
