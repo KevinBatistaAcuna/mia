@@ -63,6 +63,7 @@ export async function getDayAttendance(
       and(
         eq(scheduleSlots.weekCycle, weekCycle),
         eq(scheduleSlots.weekday, weekday),
+        eq(scheduleSlots.kind, "session"),
         eq(children.active, true),
       ),
     )
@@ -75,17 +76,20 @@ export async function getDayAttendance(
 
   const bySlot = new Map(records.map((r) => [r.slotId, r]));
 
-  let items: DayAttendanceItem[] = slots.map((slot) => {
+  let items: DayAttendanceItem[] = slots.flatMap((slot) => {
+    if (!slot.childId) return [];
     const record = bySlot.get(slot.slotId);
-    return {
-      slotId: slot.slotId,
-      childId: slot.childId,
-      childName: slot.childName,
-      specialty: slot.specialty,
-      time: slot.time,
-      status: record?.status ?? null,
-      attendanceId: record?.id ?? null,
-    };
+    return [
+      {
+        slotId: slot.slotId,
+        childId: slot.childId,
+        childName: slot.childName,
+        specialty: slot.specialty,
+        time: slot.time,
+        status: record?.status ?? null,
+        attendanceId: record?.id ?? null,
+      },
+    ];
   });
 
   if (specialty) {
@@ -110,7 +114,10 @@ export async function markAttendanceAction(
   }
 
   const allSlots = await db.select().from(scheduleSlots);
-  const selected = allSlots.filter((s) => slotIds.includes(s.id));
+  const selected = allSlots.filter(
+    (s) =>
+      slotIds.includes(s.id) && s.kind === "session" && Boolean(s.childId),
+  );
 
   if (selected.length === 0) {
     return { ok: false, error: "No se encontraron citas." };
@@ -119,6 +126,9 @@ export async function markAttendanceAction(
   const now = new Date();
 
   for (const slot of selected) {
+    const childId = slot.childId;
+    if (!childId) continue;
+
     const existing = await db
       .select()
       .from(attendanceRecords)
@@ -137,7 +147,7 @@ export async function markAttendanceAction(
           status,
           markedBy: user.id,
           updatedAt: now,
-          childId: slot.childId,
+          childId,
           specialty: slot.specialty,
           time: slot.time,
         })
@@ -147,7 +157,7 @@ export async function markAttendanceAction(
         id: createId(),
         date,
         slotId: slot.id,
-        childId: slot.childId,
+        childId,
         specialty: slot.specialty,
         time: slot.time,
         status,

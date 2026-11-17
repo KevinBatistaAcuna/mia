@@ -1,7 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useState, useTransition } from "react";
+import {
+  useActionState,
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+} from "react";
 import {
   createChildAction,
   toggleChildActiveAction,
@@ -29,8 +35,18 @@ export function ChildrenManager({ childrenList }: { childrenList: Child[] }) {
     initial,
   );
   const [editing, setEditing] = useState<Child | null>(null);
+  const [query, setQuery] = useState("");
   const router = useRouter();
   const [, startTransition] = useTransition();
+  const activeCount = childrenList.filter((child) => child.active).length;
+
+  const filteredChildren = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return childrenList;
+    return childrenList.filter((child) =>
+      child.name.toLowerCase().includes(q),
+    );
+  }, [childrenList, query]);
 
   useEffect(() => {
     if (createState?.ok) {
@@ -87,18 +103,37 @@ export function ChildrenManager({ childrenList }: { childrenList: Child[] }) {
 
       <section className="card overflow-hidden">
         <div className="border-b border-border px-5 py-4">
-          <h2 className="text-lg font-semibold">Listado</h2>
-          <p className="text-sm text-muted">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-lg font-semibold">Listado</h2>
+            <p className="text-sm font-medium text-primary">
+              {activeCount} {activeCount === 1 ? "niño activo" : "niños activos"}
+            </p>
+          </div>
+          <p className="mb-3 text-sm text-muted">
             Los inactivos no aparecen en agenda, asistencia ni pagos.
           </p>
+          <div className="field">
+            <label htmlFor="child-search">Buscar niño</label>
+            <input
+              id="child-search"
+              type="search"
+              placeholder="Nombre…"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </div>
         </div>
         <ul className="divide-y divide-border">
           {childrenList.length === 0 ? (
             <li className="px-5 py-8 text-center text-muted">
               Aún no hay niños registrados.
             </li>
+          ) : filteredChildren.length === 0 ? (
+            <li className="px-5 py-8 text-center text-muted">
+              Ningún niño coincide con “{query}”.
+            </li>
           ) : (
-            childrenList.map((child) => (
+            filteredChildren.map((child) => (
               <li key={child.id} className="px-5 py-4">
                 {editing?.id === child.id ? (
                   <form action={editAction} className="space-y-3">

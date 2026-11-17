@@ -1,9 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { SPECIALTY_LABELS, SPECIALTY_SHORT } from "@/lib/constants";
+import {
+  specialtyLabel,
+  specialtyShort,
+  type SpecialtyInfo,
+} from "@/lib/constants";
 import { downloadAttendanceReportCsv } from "@/lib/report-export";
-import { specialties as specialtyList, type Specialty } from "@/db/schema";
+import type { Specialty } from "@/db/schema";
 
 type SpecStats = {
   specialty: Specialty;
@@ -39,12 +43,29 @@ function pctTone(value: number | null) {
 export function ReportsView({
   yearMonth,
   rows,
+  specialtyCatalog,
 }: {
   yearMonth: string;
   rows: ReportRow[];
+  specialtyCatalog: SpecialtyInfo[];
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+
+  const columns = useMemo(() => {
+    const seen = new Set(specialtyCatalog.map((s) => s.id));
+    const extras = rows
+      .flatMap((row) => row.specialties.map((s) => s.specialty))
+      .filter((id) => !seen.has(id));
+    const uniqueExtras = [...new Set(extras)].map((id) => ({
+      id,
+      name: id,
+      shortCode: id.toUpperCase().slice(0, 4),
+      active: false,
+      sortOrder: 999,
+    }));
+    return [...specialtyCatalog, ...uniqueExtras];
+  }, [rows, specialtyCatalog]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -114,13 +135,13 @@ export function ReportsView({
                   <th className="hidden px-2 py-2 text-right font-semibold sm:table-cell">
                     Sesiones
                   </th>
-                  {specialtyList.map((spec) => (
+                  {columns.map((spec) => (
                     <th
-                      key={spec}
+                      key={spec.id}
                       className="px-2 py-2 text-right font-semibold"
-                      title={SPECIALTY_LABELS[spec]}
+                      title={specialtyLabel(spec.id, columns)}
                     >
-                      {SPECIALTY_SHORT[spec]}
+                      {specialtyShort(spec.id, columns)}
                     </th>
                   ))}
                 </tr>
@@ -156,7 +177,7 @@ export function ReportsView({
                           <div className="mt-1 space-y-0.5 pb-1 text-xs text-muted">
                             {row.specialties.map((spec) => (
                               <p key={spec.specialty}>
-                                {SPECIALTY_SHORT[spec.specialty]}: P{" "}
+                                {specialtyShort(spec.specialty, columns)}: P{" "}
                                 {spec.presente} · T {spec.tardia} · AJ{" "}
                                 {spec.ausenteJustificado} · AI{" "}
                                 {spec.ausenteInjustificado} · CF{" "}
@@ -174,16 +195,16 @@ export function ReportsView({
                       <td className="hidden px-2 py-1.5 align-top text-right tabular-nums text-muted sm:table-cell">
                         {row.totals.attended}/{row.totals.counted}
                       </td>
-                      {specialtyList.map((spec) => {
-                        const stats = bySpec[spec];
+                      {columns.map((spec) => {
+                        const stats = bySpec[spec.id];
                         return (
                           <td
-                            key={spec}
+                            key={spec.id}
                             className={`px-2 py-1.5 align-top text-right tabular-nums ${pctTone(stats?.percentage ?? null)}`}
                             title={
                               stats
-                                ? `${SPECIALTY_LABELS[spec]}: ${stats.attended}/${stats.counted}`
-                                : SPECIALTY_LABELS[spec]
+                                ? `${specialtyLabel(spec.id, columns)}: ${stats.attended}/${stats.counted}`
+                                : specialtyLabel(spec.id, columns)
                             }
                           >
                             {pctLabel(stats?.percentage ?? null)}

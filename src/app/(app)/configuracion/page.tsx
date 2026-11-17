@@ -1,6 +1,10 @@
 import { redirect } from "next/navigation";
 import { SettingsPanel } from "@/components/SettingsPanel";
-import { getSettings, listUsers } from "@/lib/actions/settings";
+import {
+  getSettings,
+  listSpecialties,
+  listUsers,
+} from "@/lib/actions/settings";
 import { requireUser } from "@/lib/auth";
 
 export default async function ConfiguracionPage() {
@@ -9,7 +13,11 @@ export default async function ConfiguracionPage() {
     redirect(user.role === "therapist" ? "/agenda" : "/asistencia");
   }
 
-  const [settings, users] = await Promise.all([getSettings(), listUsers()]);
+  const [settings, users, specialtiesList] = await Promise.all([
+    getSettings(),
+    listUsers(),
+    listSpecialties(true),
+  ]);
 
   if (!settings) {
     return (
@@ -19,6 +27,8 @@ export default async function ConfiguracionPage() {
     );
   }
 
+  const activeSpecialties = specialtiesList.filter((s) => s.active);
+
   return (
     <div className="space-y-4">
       <div>
@@ -26,13 +36,14 @@ export default async function ConfiguracionPage() {
           Configuración
         </h1>
         <p className="text-muted">
-          Solo la administradora gestiona usuarios, días de atención y el ciclo
-          A/B.
+          Solo la administradora gestiona usuarios, especialidades, días de
+          atención y el ciclo A/B.
         </p>
       </div>
       <SettingsPanel
         settings={settings}
         users={users}
+        specialtiesList={activeSpecialties}
         currentUserId={user.id}
       />
     </div>

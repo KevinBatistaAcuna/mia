@@ -1,8 +1,8 @@
 import { AttendanceBoard } from "@/components/AttendanceBoard";
 import { getDayAttendance } from "@/lib/actions/attendance";
+import { listSpecialties } from "@/lib/actions/settings";
 import { requireEditor } from "@/lib/auth";
 import { todayLocal } from "@/lib/cycle";
-import type { Specialty } from "@/db/schema";
 
 export default async function AsistenciaPage({
   searchParams,
@@ -14,11 +14,12 @@ export default async function AsistenciaPage({
   const date = params.date && /^\d{4}-\d{2}-\d{2}$/.test(params.date)
     ? params.date
     : todayLocal();
+
+  const specialtyCatalog = await listSpecialties();
   const specialty =
-    params.specialty === "fisica" ||
-    params.specialty === "lenguaje" ||
-    params.specialty === "ocupacional"
-      ? (params.specialty as Specialty)
+    params.specialty &&
+    specialtyCatalog.some((item) => item.id === params.specialty)
+      ? params.specialty
       : undefined;
 
   const data = await getDayAttendance(date, specialty);
@@ -38,6 +39,7 @@ export default async function AsistenciaPage({
         weekCycle={data.weekCycle}
         weekday={data.weekday}
         items={data.items}
+        specialtyCatalog={specialtyCatalog}
       />
     </div>
   );

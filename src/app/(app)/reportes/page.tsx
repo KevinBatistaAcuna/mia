@@ -1,5 +1,6 @@
 import { ReportsView } from "@/components/ReportsView";
 import { getMonthlyReport } from "@/lib/actions/attendance";
+import { listSpecialties } from "@/lib/actions/settings";
 import { requireEditor } from "@/lib/auth";
 import { currentYearMonth } from "@/lib/cycle";
 
@@ -15,7 +16,10 @@ export default async function ReportesPage({
       ? params.month
       : currentYearMonth();
 
-  const rows = await getMonthlyReport(yearMonth);
+  const [rows, specialtyCatalog] = await Promise.all([
+    getMonthlyReport(yearMonth),
+    listSpecialties(),
+  ]);
 
   return (
     <div className="space-y-4">
@@ -27,7 +31,11 @@ export default async function ReportesPage({
           Porcentaje mensual de asistencia por niño y especialidad.
         </p>
       </div>
-      <ReportsView yearMonth={yearMonth} rows={rows} />
+      <ReportsView
+        yearMonth={yearMonth}
+        rows={rows}
+        specialtyCatalog={specialtyCatalog}
+      />
     </div>
   );
 }

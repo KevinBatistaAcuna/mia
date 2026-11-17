@@ -1,17 +1,18 @@
 import { AgendaBoard } from "@/components/AgendaBoard";
 import { listChildren } from "@/lib/actions/children";
 import { listScheduleSlots } from "@/lib/actions/schedule";
-import { getSettings } from "@/lib/actions/settings";
+import { getSettings, listSpecialties } from "@/lib/actions/settings";
 import { requireUser } from "@/lib/auth";
 import { DEFAULT_ACTIVE_WEEKDAYS } from "@/lib/constants";
 import { getWeekCycle, todayLocal } from "@/lib/cycle";
 
 export default async function AgendaPage() {
   const user = await requireUser();
-  const [slots, childrenList, settings] = await Promise.all([
+  const [slots, childrenList, settings, specialtyCatalog] = await Promise.all([
     listScheduleSlots(),
     listChildren(true),
     getSettings(),
+    listSpecialties(),
   ]);
 
   const initialCycle = settings
@@ -32,13 +33,14 @@ export default async function AgendaPage() {
           <p className="text-sm text-muted sm:text-base">
             {readOnly
               ? "Consulta de horarios. Solo lectura."
-              : "Vista compacta por día. Selecciona una cita para reasignar, editar o liberar."}
+              : "Por día y especialidad. Selecciona una cita para reasignar, editar o liberar."}
           </p>
         </div>
       </div>
       <AgendaBoard
         slots={slots}
         childrenList={childrenList}
+        specialtyCatalog={specialtyCatalog}
         initialCycle={initialCycle}
         activeWeekdays={activeWeekdays}
         readOnly={readOnly}

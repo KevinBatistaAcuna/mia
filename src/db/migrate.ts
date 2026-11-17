@@ -43,6 +43,25 @@ async function migrate() {
     )
   `);
 
+  await db.run(sql`
+    CREATE TABLE IF NOT EXISTS specialties (
+      id TEXT PRIMARY KEY NOT NULL,
+      name TEXT NOT NULL,
+      short_code TEXT NOT NULL UNIQUE,
+      active INTEGER NOT NULL DEFAULT 1,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    )
+  `);
+
+  await db.run(sql`
+    INSERT OR IGNORE INTO specialties (id, name, short_code, active, sort_order)
+    VALUES
+      ('fisica', 'Terapia física', 'TF', 1, 1),
+      ('lenguaje', 'Terapia de lenguaje', 'TL', 1, 2),
+      ('ocupacional', 'Terapia ocupacional', 'TO', 1, 3)
+  `);
+
   if (!(await tableHasColumn("foundation_settings", "active_weekdays"))) {
     await db.run(
       sql`ALTER TABLE foundation_settings ADD COLUMN active_weekdays TEXT NOT NULL DEFAULT '[1,2,3]'`,
@@ -52,7 +71,8 @@ async function migrate() {
   await db.run(sql`
     CREATE TABLE IF NOT EXISTS schedule_slots (
       id TEXT PRIMARY KEY NOT NULL,
-      child_id TEXT NOT NULL REFERENCES children(id) ON DELETE CASCADE,
+      child_id TEXT REFERENCES children(id) ON DELETE CASCADE,
+      kind TEXT NOT NULL DEFAULT 'session',
       specialty TEXT NOT NULL,
       weekday INTEGER NOT NULL,
       time TEXT NOT NULL,
@@ -61,10 +81,33 @@ async function migrate() {
     )
   `);
 
-  await db.run(sql`
-    CREATE UNIQUE INDEX IF NOT EXISTS slot_unique
-    ON schedule_slots (specialty, weekday, time, week_cycle)
-  `);
+  if (!(await tableHasColumn("schedule_slots", "kind"))) {
+    await db.run(sql`
+      CREATE TABLE schedule_slots_new (
+        id TEXT PRIMARY KEY NOT NULL,
+        child_id TEXT REFERENCES children(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL DEFAULT 'session',
+        specialty TEXT NOT NULL,
+        weekday INTEGER NOT NULL,
+        time TEXT NOT NULL,
+        week_cycle TEXT NOT NULL,
+        created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+      )
+    `);
+    await db.run(sql`
+      INSERT INTO schedule_slots_new (
+        id, child_id, kind, specialty, weekday, time, week_cycle, created_at
+      )
+      SELECT
+        id, child_id, 'session', specialty, weekday, time, week_cycle, created_at
+      FROM schedule_slots
+    `);
+    await db.run(sql`DROP TABLE schedule_slots`);
+    await db.run(sql`ALTER TABLE schedule_slots_new RENAME TO schedule_slots`);
+  }
+
+  // Group sessions may share specialty + day + time + cycle.
+  await db.run(sql`DROP INDEX IF EXISTS slot_unique`);
 
   await db.run(sql`
     CREATE TABLE IF NOT EXISTS attendance_records (

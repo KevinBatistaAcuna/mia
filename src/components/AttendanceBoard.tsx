@@ -7,14 +7,14 @@ import {
   type DayAttendanceItem,
 } from "@/lib/actions/attendance";
 import {
-  SPECIALTY_LABELS,
+  specialtyLabel,
   STATUS_COLORS,
   STATUS_LABELS,
   WEEKDAY_LABELS,
+  type SpecialtyInfo,
 } from "@/lib/constants";
 import {
   attendanceStatuses,
-  specialties,
   type AttendanceStatus,
   type Specialty,
   type WeekCycle,
@@ -25,27 +25,33 @@ export function AttendanceBoard({
   weekCycle,
   weekday,
   items,
+  specialtyCatalog,
 }: {
   date: string;
   weekCycle: WeekCycle;
   weekday: number;
   items: DayAttendanceItem[];
+  specialtyCatalog: SpecialtyInfo[];
 }) {
   const router = useRouter();
   const [selectedSpecialty, setSelectedSpecialty] = useState<Specialty | "all">(
     "all",
   );
+  const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const filtered = useMemo(
-    () =>
-      selectedSpecialty === "all"
-        ? items
-        : items.filter((i) => i.specialty === selectedSpecialty),
-    [items, selectedSpecialty],
-  );
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return items.filter((item) => {
+      if (selectedSpecialty !== "all" && item.specialty !== selectedSpecialty) {
+        return false;
+      }
+      if (!q) return true;
+      return item.childName.toLowerCase().includes(q);
+    });
+  }, [items, selectedSpecialty, query]);
 
   const pendingCount = filtered.filter((i) => !i.status).length;
 
@@ -144,20 +150,35 @@ export function AttendanceBoard({
             </p>
             <h2 className="text-xl font-semibold">Citas del día</h2>
           </div>
-          <form className="field">
-            <label htmlFor="date">Fecha</label>
-            <input
-              id="date"
-              name="date"
-              type="date"
-              defaultValue={date}
-              onChange={(e) => {
-                const value = e.target.value;
-                if (!value) return;
-                window.location.href = `/asistencia?date=${value}`;
-              }}
-            />
-          </form>
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-end">
+            <form className="field">
+              <label htmlFor="date">Fecha</label>
+              <input
+                id="date"
+                name="date"
+                type="date"
+                defaultValue={date}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (!value) return;
+                  window.location.href = `/asistencia?date=${value}`;
+                }}
+              />
+            </form>
+            <div className="field min-w-0 sm:w-56">
+              <label htmlFor="attendance-child-search">Buscar niño</label>
+              <input
+                id="attendance-child-search"
+                type="search"
+                placeholder="Nombre…"
+                value={query}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setSelected(new Set());
+                }}
+              />
+            </div>
+          </div>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -171,17 +192,17 @@ export function AttendanceBoard({
           >
             Todas
           </button>
-          {specialties.map((spec) => (
+          {specialtyCatalog.map((spec) => (
             <button
-              key={spec}
+              key={spec.id}
               type="button"
-              className={`btn ${selectedSpecialty === spec ? "btn-primary" : "btn-secondary"}`}
+              className={`btn ${selectedSpecialty === spec.id ? "btn-primary" : "btn-secondary"}`}
               onClick={() => {
-                setSelectedSpecialty(spec);
+                setSelectedSpecialty(spec.id);
                 setSelected(new Set());
               }}
             >
-              {SPECIALTY_LABELS[spec]}
+              {spec.name}
             </button>
           ))}
         </div>
@@ -204,7 +225,9 @@ export function AttendanceBoard({
             <ul className="space-y-1.5 pb-24 lg:pb-0">
               {filtered.length === 0 ? (
                 <li className="card p-8 text-center text-muted">
-                  No hay citas para esta fecha y filtro.
+                  {query.trim()
+                    ? `Ningún niño coincide con “${query}”.`
+                    : "No hay citas para esta fecha y filtro."}
                 </li>
               ) : (
                 filtered.map((item) => {
@@ -235,7 +258,7 @@ export function AttendanceBoard({
                             {item.childName}
                           </span>
                           <span className="block truncate text-xs text-muted">
-                            {SPECIALTY_LABELS[item.specialty]}
+                            {specialtyLabel(item.specialty, specialtyCatalog)}
                           </span>
                         </span>
                         <span

@@ -9,8 +9,25 @@ import {
 export const userRoles = ["admin", "assistant", "therapist"] as const;
 export type UserRole = (typeof userRoles)[number];
 
-export const specialties = ["fisica", "lenguaje", "ocupacional"] as const;
-export type Specialty = (typeof specialties)[number];
+/** Specialty ids are free-form slugs managed in Configuración. */
+export type Specialty = string;
+
+export const slotKinds = [
+  "session",
+  "almuerzo",
+  "cafe",
+  "administrativo",
+  "libre",
+] as const;
+export type SlotKind = (typeof slotKinds)[number];
+
+export const contractSlotKinds = [
+  "almuerzo",
+  "cafe",
+  "administrativo",
+  "libre",
+] as const;
+export type ContractSlotKind = (typeof contractSlotKinds)[number];
 
 export const weekCycles = ["A", "B"] as const;
 export type WeekCycle = (typeof weekCycles)[number];
@@ -30,6 +47,17 @@ export const users = sqliteTable("users", {
   name: text("name").notNull(),
   passwordHash: text("password_hash").notNull(),
   role: text("role", { enum: userRoles }).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+
+export const specialties = sqliteTable("specialties", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  shortCode: text("short_code").notNull().unique(),
+  active: integer("active", { mode: "boolean" }).notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .default(sql`(unixepoch() * 1000)`),
@@ -78,30 +106,20 @@ export const foundationSettings = sqliteTable("foundation_settings", {
   activeWeekdays: text("active_weekdays").notNull().default("[1,2,3]"),
 });
 
-export const scheduleSlots = sqliteTable(
-  "schedule_slots",
-  {
-    id: text("id").primaryKey(),
-    childId: text("child_id")
-      .notNull()
-      .references(() => children.id, { onDelete: "cascade" }),
-    specialty: text("specialty", { enum: specialties }).notNull(),
-    weekday: integer("weekday").notNull(),
-    time: text("time").notNull(),
-    weekCycle: text("week_cycle", { enum: weekCycles }).notNull(),
-    createdAt: integer("created_at", { mode: "timestamp_ms" })
-      .notNull()
-      .default(sql`(unixepoch() * 1000)`),
-  },
-  (table) => [
-    uniqueIndex("slot_unique").on(
-      table.specialty,
-      table.weekday,
-      table.time,
-      table.weekCycle,
-    ),
-  ],
-);
+export const scheduleSlots = sqliteTable("schedule_slots", {
+  id: text("id").primaryKey(),
+  childId: text("child_id").references(() => children.id, {
+    onDelete: "cascade",
+  }),
+  kind: text("kind", { enum: slotKinds }).notNull().default("session"),
+  specialty: text("specialty").notNull(),
+  weekday: integer("weekday").notNull(),
+  time: text("time").notNull(),
+  weekCycle: text("week_cycle", { enum: weekCycles }).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
 
 export const attendanceRecords = sqliteTable(
   "attendance_records",
@@ -114,7 +132,7 @@ export const attendanceRecords = sqliteTable(
     childId: text("child_id")
       .notNull()
       .references(() => children.id, { onDelete: "cascade" }),
-    specialty: text("specialty", { enum: specialties }).notNull(),
+    specialty: text("specialty").notNull(),
     time: text("time").notNull(),
     status: text("status", { enum: attendanceStatuses }).notNull(),
     markedBy: text("marked_by").references(() => users.id, {

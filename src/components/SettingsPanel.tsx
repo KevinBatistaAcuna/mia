@@ -3,13 +3,20 @@
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useState, useTransition } from "react";
 import {
+  createSpecialtyAction,
   createUserAction,
+  deleteSpecialtyAction,
   deleteUserAction,
   updateSettingsAction,
   updateUserAction,
   type ActionResult,
 } from "@/lib/actions/settings";
-import { ROLE_LABELS, WEEKDAY_LABELS, WEEKDAYS } from "@/lib/constants";
+import {
+  ROLE_LABELS,
+  WEEKDAY_LABELS,
+  WEEKDAYS,
+  type SpecialtyInfo,
+} from "@/lib/constants";
 import type { UserRole } from "@/db/schema";
 
 type Settings = {
@@ -69,10 +76,12 @@ function TrashIcon() {
 export function SettingsPanel({
   settings,
   users,
+  specialtiesList,
   currentUserId,
 }: {
   settings: Settings;
   users: UserRow[];
+  specialtiesList: SpecialtyInfo[];
   currentUserId: string;
 }) {
   const [settingsState, settingsAction, settingsPending] = useActionState(
@@ -87,8 +96,13 @@ export function SettingsPanel({
     updateUserAction,
     initial,
   );
+  const [specialtyState, specialtyAction, specialtyPending] = useActionState(
+    createSpecialtyAction,
+    initial,
+  );
   const [editingId, setEditingId] = useState<string | null>(null);
   const [listError, setListError] = useState<string | null>(null);
+  const [specialtyError, setSpecialtyError] = useState<string | null>(null);
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
@@ -100,6 +114,15 @@ export function SettingsPanel({
       form?.reset();
     }
   }, [userState]);
+
+  useEffect(() => {
+    if (specialtyState?.ok) {
+      const form = document.getElementById(
+        "create-specialty-form",
+      ) as HTMLFormElement | null;
+      form?.reset();
+    }
+  }, [specialtyState]);
 
   useEffect(() => {
     if (editState?.ok) setEditingId(null);
@@ -181,6 +204,110 @@ export function SettingsPanel({
               <p className="mt-2 text-sm text-rose-700">{settingsState.error}</p>
             ) : null}
           </div>
+        </form>
+      </section>
+
+      <section className="card p-5">
+        <h2 className="mb-1 text-lg font-semibold">Especialidades</h2>
+        <p className="mb-4 text-sm text-muted">
+          Agrega o quita terapias disponibles en agenda, asistencia y reportes.
+        </p>
+        {specialtyError ? (
+          <p className="mb-3 text-sm text-rose-700">{specialtyError}</p>
+        ) : null}
+        <ul className="mb-6 divide-y divide-border rounded-xl border border-border">
+          {specialtiesList.length === 0 ? (
+            <li className="px-4 py-6 text-center text-sm text-muted">
+              Aún no hay especialidades.
+            </li>
+          ) : (
+            specialtiesList.map((specialty) => (
+              <li
+                key={specialty.id}
+                className="flex items-center justify-between gap-3 px-4 py-3"
+              >
+                <div className="min-w-0">
+                  <p className="font-semibold">{specialty.name}</p>
+                  <p className="text-sm text-muted">
+                    Código {specialty.shortCode}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-rose-200 bg-[#fff1f1] text-rose-700 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-45"
+                  title="Quitar especialidad"
+                  aria-label={`Quitar ${specialty.name}`}
+                  disabled={pending}
+                  onClick={() => {
+                    if (
+                      !window.confirm(
+                        `¿Quitar ${specialty.name}? Si tiene horarios, solo se desactivará.`,
+                      )
+                    ) {
+                      return;
+                    }
+                    setSpecialtyError(null);
+                    startTransition(async () => {
+                      const result = await deleteSpecialtyAction(specialty.id);
+                      if (!result.ok) {
+                        setSpecialtyError(result.error);
+                        return;
+                      }
+                      router.refresh();
+                    });
+                  }}
+                >
+                  <TrashIcon />
+                </button>
+              </li>
+            ))
+          )}
+        </ul>
+
+        <h3 className="mb-3 font-semibold">Agregar especialidad</h3>
+        <form
+          id="create-specialty-form"
+          action={specialtyAction}
+          className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_8rem_auto]"
+        >
+          <div className="field">
+            <label htmlFor="specialtyName">Nombre</label>
+            <input
+              id="specialtyName"
+              name="name"
+              required
+              placeholder="Terapia conductual"
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="shortCode">Código</label>
+            <input
+              id="shortCode"
+              name="shortCode"
+              required
+              maxLength={6}
+              placeholder="TC"
+            />
+          </div>
+          <div className="flex items-end">
+            <button
+              type="submit"
+              className="btn btn-primary w-full sm:w-auto"
+              disabled={specialtyPending}
+            >
+              {specialtyPending ? "Guardando..." : "Agregar"}
+            </button>
+          </div>
+          {specialtyState && !specialtyState.ok ? (
+            <p className="text-sm text-rose-700 sm:col-span-3">
+              {specialtyState.error}
+            </p>
+          ) : null}
+          {specialtyState?.ok ? (
+            <p className="text-sm text-emerald-700 sm:col-span-3">
+              Especialidad agregada.
+            </p>
+          ) : null}
         </form>
       </section>
 
