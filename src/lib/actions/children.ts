@@ -84,3 +84,24 @@ export async function toggleChildActiveAction(id: string, active: boolean) {
   revalidatePath("/asistencia");
   revalidatePath("/pagos");
 }
+
+export async function deleteChildAction(id: string): Promise<ActionResult> {
+  await requireEditor();
+  if (!id) return { ok: false, error: "Niño inválido." };
+
+  const [child] = await db
+    .select({ id: children.id })
+    .from(children)
+    .where(eq(children.id, id))
+    .limit(1);
+  if (!child) return { ok: false, error: "Niño no encontrado." };
+
+  await db.delete(children).where(eq(children.id, id));
+
+  revalidatePath("/ninos");
+  revalidatePath("/agenda");
+  revalidatePath("/asistencia");
+  revalidatePath("/reportes");
+  revalidatePath("/pagos");
+  return { ok: true };
+}

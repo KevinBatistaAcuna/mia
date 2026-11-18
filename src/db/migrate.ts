@@ -1,9 +1,68 @@
 import { sql } from "drizzle-orm";
 import { db } from "./index";
 
-async function tableHasColumn(table: string, column: string) {
+async function tableInfo(table: string) {
   const result = await db.$client.execute(`PRAGMA table_info(${table})`);
-  return result.rows.some((row) => String(row.name) === column);
+  return result.rows.map((row) => ({
+    name: String(row.name),
+    notnull: Number(row.notnull) === 1,
+  }));
+}
+
+async function tableHasColumn(table: string, column: string) {
+  const columns = await tableInfo(table);
+  return columns.some((col) => col.name === column);
+}
+
+async function columnIsNotNull(table: string, column: string) {
+  const columns = await tableInfo(table);
+  return columns.find((col) => col.name === column)?.notnull ?? false;
+}
+
+/** Rebuild schedule_slots so kind exists and child_id stays nullable. */
+async function rebuildScheduleSlotsTable() {
+  // attendance_records.slot_id references this table; disable FKs for the swap.
+  await db.run(sql`PRAGMA foreign_keys = OFF`);
+  try {
+    await db.run(sql`
+      CREATE TABLE schedule_slots_new (
+        id TEXT PRIMARY KEY NOT NULL,
+        child_id TEXT REFERENCES children(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL DEFAULT 'session',
+        specialty TEXT NOT NULL,
+        weekday INTEGER NOT NULL,
+        time TEXT NOT NULL,
+        week_cycle TEXT NOT NULL,
+        created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+      )
+    `);
+
+    const hasKind = await tableHasColumn("schedule_slots", "kind");
+    if (hasKind) {
+      await db.run(sql`
+        INSERT INTO schedule_slots_new (
+          id, child_id, kind, specialty, weekday, time, week_cycle, created_at
+        )
+        SELECT
+          id, child_id, kind, specialty, weekday, time, week_cycle, created_at
+        FROM schedule_slots
+      `);
+    } else {
+      await db.run(sql`
+        INSERT INTO schedule_slots_new (
+          id, child_id, kind, specialty, weekday, time, week_cycle, created_at
+        )
+        SELECT
+          id, child_id, 'session', specialty, weekday, time, week_cycle, created_at
+        FROM schedule_slots
+      `);
+    }
+
+    await db.run(sql`DROP TABLE schedule_slots`);
+    await db.run(sql`ALTER TABLE schedule_slots_new RENAME TO schedule_slots`);
+  } finally {
+    await db.run(sql`PRAGMA foreign_keys = ON`);
+  }
 }
 
 async function migrate() {
@@ -81,29 +140,20 @@ async function migrate() {
     )
   `);
 
+  // Prod may still have the pre-kind schema. Prefer ADD COLUMN; rebuild if
+  // child_id is still NOT NULL (needed for slots tipo contrato sin niño).
   if (!(await tableHasColumn("schedule_slots", "kind"))) {
-    await db.run(sql`
-      CREATE TABLE schedule_slots_new (
-        id TEXT PRIMARY KEY NOT NULL,
-        child_id TEXT REFERENCES children(id) ON DELETE CASCADE,
-        kind TEXT NOT NULL DEFAULT 'session',
-        specialty TEXT NOT NULL,
-        weekday INTEGER NOT NULL,
-        time TEXT NOT NULL,
-        week_cycle TEXT NOT NULL,
-        created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
-      )
-    `);
-    await db.run(sql`
-      INSERT INTO schedule_slots_new (
-        id, child_id, kind, specialty, weekday, time, week_cycle, created_at
-      )
-      SELECT
-        id, child_id, 'session', specialty, weekday, time, week_cycle, created_at
-      FROM schedule_slots
-    `);
-    await db.run(sql`DROP TABLE schedule_slots`);
-    await db.run(sql`ALTER TABLE schedule_slots_new RENAME TO schedule_slots`);
+    try {
+      await db.run(
+        sql`ALTER TABLE schedule_slots ADD COLUMN kind TEXT NOT NULL DEFAULT 'session'`,
+      );
+    } catch {
+      await rebuildScheduleSlotsTable();
+    }
+  }
+
+  if (await columnIsNotNull("schedule_slots", "child_id")) {
+    await rebuildScheduleSlotsTable();
   }
 
   // Group sessions may share specialty + day + time + cycle.

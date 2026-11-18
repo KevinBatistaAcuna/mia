@@ -10,6 +10,7 @@ import {
 } from "react";
 import {
   createChildAction,
+  deleteChildAction,
   toggleChildActiveAction,
   updateChildAction,
   type ActionResult,
@@ -25,6 +26,27 @@ type Child = {
 
 const initial: ActionResult | null = null;
 
+function TrashIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M3 6h18" />
+      <path d="M8 6V4h8v2" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+      <path d="M10 11v6" />
+      <path d="M14 11v6" />
+    </svg>
+  );
+}
+
 export function ChildrenManager({ childrenList }: { childrenList: Child[] }) {
   const [createState, createAction, createPending] = useActionState(
     createChildAction,
@@ -36,8 +58,9 @@ export function ChildrenManager({ childrenList }: { childrenList: Child[] }) {
   );
   const [editing, setEditing] = useState<Child | null>(null);
   const [query, setQuery] = useState("");
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const router = useRouter();
-  const [, startTransition] = useTransition();
+  const [pending, startTransition] = useTransition();
   const activeCount = childrenList.filter((child) => child.active).length;
 
   const filteredChildren = useMemo(() => {
@@ -122,6 +145,9 @@ export function ChildrenManager({ childrenList }: { childrenList: Child[] }) {
               onChange={(event) => setQuery(event.target.value)}
             />
           </div>
+          {deleteError ? (
+            <p className="mt-3 text-sm text-rose-700">{deleteError}</p>
+          ) : null}
         </div>
         <ul className="divide-y divide-border">
           {childrenList.length === 0 ? (
@@ -208,6 +234,7 @@ export function ChildrenManager({ childrenList }: { childrenList: Child[] }) {
                       <button
                         type="button"
                         className="btn btn-secondary"
+                        disabled={pending}
                         onClick={() =>
                           startTransition(async () => {
                             await toggleChildActiveAction(
@@ -219,6 +246,34 @@ export function ChildrenManager({ childrenList }: { childrenList: Child[] }) {
                         }
                       >
                         {child.active ? "Desactivar" : "Activar"}
+                      </button>
+                      <button
+                        type="button"
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-rose-200 bg-[#fff1f1] text-rose-700 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-45"
+                        title="Eliminar niño"
+                        aria-label={`Eliminar ${child.name}`}
+                        disabled={pending}
+                        onClick={() => {
+                          if (
+                            !window.confirm(
+                              `¿Eliminar a ${child.name}? Se borrarán también sus horarios, asistencias y pagos.`,
+                            )
+                          ) {
+                            return;
+                          }
+                          setDeleteError(null);
+                          startTransition(async () => {
+                            const result = await deleteChildAction(child.id);
+                            if (!result.ok) {
+                              setDeleteError(result.error);
+                              return;
+                            }
+                            if (editing?.id === child.id) setEditing(null);
+                            router.refresh();
+                          });
+                        }}
+                      >
+                        <TrashIcon />
                       </button>
                     </div>
                   </div>
